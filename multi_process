@@ -1,0 +1,76 @@
+#!/bin/bash -x
+
+# trap
+trap_exit() { kill -9 0;}
+trap 'trap_exit; exit 2' 1 2 3 15
+
+# process number
+process=3
+
+# parent fifo, parent get idle from child
+pf=/tmp/parent.fifo
+
+# child fifo, send job to child
+for i in `seq $process`; do
+        eval t$i=/tmp/child${i}.fifo
+done
+for i in `seq $process`; do
+        [ -p "/tmp/child${i}.fifo" ] || {
+                mkfifo /tmp/child$i.fifo
+        }
+done
+
+# sub child
+sub_read() {
+        eval child_fifo=\$t$1
+        # send first signal to parent, child start
+        echo $1 >> $pf  # 这里用 ">" 程序不就不能继续?
+
+        while read line; do
+                [ "$line" = "end" ] && {
+                        echo "end" >> $pf       # send end signal to parent, child end
+                        rm -f $child_fifo
+                        echo "child end"
+                        break   # child exit
+                }
+ 
+                # do my job here
+                {
+                        echo $1 $line
+                        sleep 1
+                }
+ 
+                echo $1 >> $pf  # send signal to parent, child $i idle
+        done <$child_fifo       # get job from parent
+}
+ 
+# child start
+for i in `seq $process`; do
+    ( sub_read $i; exit 0; ) &  # $i is the child flag
+done
+sleep 1
+ 
+# jobs
+jobs=20
+# jobs assign
+while read sig; do
+        [ "$sig" = "end" ] && {
+                # 为什么很快就到这里了?
+                echo "parent end"
+                break   # parent end all jobs assigned
+        }
+ 
+        if [ $jobs -gt 0 ]; then
+                eval cf=\$t$sig # child fifo
+                echo $jobs > $cf
+                let jobs--
+        else
+                # all job done, let child to end
+                for i in `seq $process`; do
+                        eval cf=\$t$i
+                        echo "end" > $cf
+                done
+        fi
+done <$pf       # get signal from all child, signal mark child idle
+
+wait
