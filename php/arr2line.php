@@ -22,4 +22,17 @@ $arr = array(
 
 // 怎么实现?
 
+function aprint($arr,$e=null){
+    $ret = null;
+    $pre = $e ? "$e\t" : ""; 
+    $arr = (array)$arr;
+    foreach($arr as $k => $v){
+        if(is_array($v)){
+         $ret .= aprint($v,$k);
+        }else{
+          $ret .= "{$pre}$k\t$v\n";
+        }   
 
+    }   
+    return $ret;
+}
