@@ -14,5 +14,6 @@ if __name__ == "__main__":
   pool.close()
   pool.join()
   for res in result:
+  #res 是一个res 对象, 通过get 拿到返回结果
     print res.get()
   print "Sub-process(es) done."
